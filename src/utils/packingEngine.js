@@ -113,8 +113,9 @@ export function getPackingListForTraveler(travelerId, cfg, userItems = {}) {
       .filter(item => itemIsActive(item, cfg))
       .filter(item => {
         if (!SUIT_IDS.has(item.id)) return true
-        if (cfg.selectedSuits.size === 0) return false
-        return cfg.selectedSuits.has(item.id)
+        const sel = cfg.selectedSuits instanceof Set ? cfg.selectedSuits : new Set(cfg.selectedSuits || [])
+        if (sel.size === 0) return false
+        return sel.has(item.id)
       })
       .map(item => ({ ...item, resolvedQty: resolveQty(item.qty, cfg) }))
     if (active.length > 0) result[category] = active
