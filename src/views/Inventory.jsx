@@ -129,9 +129,32 @@ export default function InventoryView({ state, addUserItem, updateUserItem, dele
   )
 }
 
+function PencilIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  )
+}
+
 function CategorySection({ cat, staticItems, userItems, onAdd, onEdit, onDelete }) {
+  const [confirmId, setConfirmId] = useState(null)
   const allCount = staticItems.length + userItems.length
   if (allCount === 0) return null
+
+  const totalRows = staticItems.length + userItems.length
 
   return (
     <div>
@@ -146,7 +169,7 @@ function CategorySection({ cat, staticItems, userItems, onAdd, onEdit, onDelete 
               i < staticItems.length - 1 || userItems.length > 0 ? 'border-b border-[#E5E7EB]' : ''
             }`}
           >
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-[15px] font-medium text-[#2D2D2D]">
                 {item.name}
                 {item.isHeavy && <span className="ml-1.5 text-[11px] text-[#D97706] font-semibold">⚠️</span>}
@@ -164,38 +187,67 @@ function CategorySection({ cat, staticItems, userItems, onAdd, onEdit, onDelete 
         ))}
 
         {userItems.map((item, i) => {
+          const isConfirming = confirmId === item.id
+          const isLast = i === userItems.length - 1
           return (
-            <div
-              key={item.id}
-              className={`flex items-start gap-3 px-4 py-3 ${i < userItems.length - 1 ? 'border-b border-[#E5E7EB]' : ''}`}
-            >
-              <div className="flex-1">
-                <p className="text-[15px] font-medium text-[#2D2D2D]">
-                  <span className="text-[#95C4A1] mr-1">★</span>
-                  {item.name}
-                  {item.isHeavy && <span className="ml-1 text-[11px] text-[#D97706]">⚠️</span>}
-                  {item.optional && <span className="ml-1 text-[13px] text-[#9CA3AF]">(optional)</span>}
-                  {item.weatherTrigger && <span className="ml-1 text-[11px] text-[#3B82F6]">🌤</span>}
-                </p>
-                {item.qty && item.qty !== 1 && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {item.qty}</p>}
-                {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {(item.conditions || []).map(c => {
-                    const tt = TRIP_TYPES.find(t => t.id === c)
-                    return (
-                      <span key={c} className="text-[11px] bg-[#f0f7f3] text-[#1B4332] rounded px-1.5 py-0.5">
-                        {tt ? tt.label : c}
-                      </span>
-                    )
-                  })}
+            <div key={item.id} className={!isLast || isConfirming ? 'border-b border-[#E5E7EB]' : ''}>
+              <div className="flex items-start gap-2 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-medium text-[#2D2D2D]">
+                    <span className="text-[#95C4A1] mr-1">★</span>
+                    {item.name}
+                    {item.isHeavy && <span className="ml-1 text-[11px] text-[#D97706]">⚠️</span>}
+                    {item.optional && <span className="ml-1 text-[13px] text-[#9CA3AF]">(optional)</span>}
+                    {item.weatherTrigger && <span className="ml-1 text-[11px] text-[#3B82F6]">🌤</span>}
+                  </p>
+                  {item.qty && item.qty !== 1 && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {item.qty}</p>}
+                  {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(item.conditions || []).map(c => {
+                      const tt = TRIP_TYPES.find(t => t.id === c)
+                      return (
+                        <span key={c} className="text-[11px] bg-[#f0f7f3] text-[#1B4332] rounded px-1.5 py-0.5">
+                          {tt ? tt.label : c}
+                        </span>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex-none flex items-center gap-0.5 pt-0.5">
+                  <button
+                    onClick={() => onEdit(item)}
+                    title="Edit"
+                    className="p-1.5 text-[#9CA3AF] hover:text-[#1B4332] hover:bg-[#f0f7f3] rounded-lg transition-colors"
+                  >
+                    <PencilIcon />
+                  </button>
+                  <button
+                    onClick={() => setConfirmId(isConfirming ? null : item.id)}
+                    title="Delete"
+                    className={`p-1.5 rounded-lg transition-colors ${isConfirming ? 'text-red-500 bg-red-50' : 'text-[#9CA3AF] hover:text-red-400 hover:bg-red-50'}`}
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => onEdit(item)}
-                className="flex-none text-[13px] text-[#1B4332] font-semibold px-2 py-1 bg-[#f0f7f3] rounded-lg"
-              >
-                ✏️ Edit
-              </button>
+
+              {isConfirming && (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50">
+                  <p className="text-[13px] text-red-600 flex-1 truncate">Delete "{item.name}"?</p>
+                  <button
+                    onClick={() => { onDelete(item); setConfirmId(null) }}
+                    className="text-[13px] font-semibold text-white bg-red-500 px-3 py-1 rounded-lg flex-none"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setConfirmId(null)}
+                    className="text-[13px] text-[#6B7280] px-2 py-1 flex-none"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}
