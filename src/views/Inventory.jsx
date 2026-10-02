@@ -20,43 +20,65 @@ const CAT_LABELS = {
   gear: 'Gear & Equipment', essentials: 'Shared Essentials',
 }
 
-export default function InventoryView({ state, addUserItem, updateUserItem, deleteUserItem }) {
+export default function InventoryView({ state, addUserItem, updateUserItem, deleteUserItem, overrideItem, deleteItem }) {
   const [activeTraveler, setActiveTraveler] = useState('topher')
   const [drawer, setDrawer] = useState(null)
 
   const staticCategories = ALL_ITEMS[activeTraveler] || {}
   const userCategories   = state?.userInventory?.[activeTraveler] || {}
+  const deletedSet       = useMemo(() => new Set(state?.deletedItems || []), [state?.deletedItems])
+  const overrides        = state?.itemOverrides || {}
 
   const mergedCategories = useMemo(() => {
     const all = {}
+
+    // Static items: filter deleted, apply overrides (override can change category)
     for (const [cat, items] of Object.entries(staticCategories)) {
-      if (!all[cat]) all[cat] = { static: [], user: [] }
-      all[cat].static = items
-    }
-    for (const [cat, items] of Object.entries(userCategories)) {
-      if (items?.length) {
-        if (!all[cat]) all[cat] = { static: [], user: [] }
-        all[cat].user = items
+      for (const item of items) {
+        if (deletedSet.has(item.id)) continue
+        const ov = overrides[item.id]
+        const effective = ov ? { ...item, ...ov } : item
+        const effectiveCat = ov?.category || cat
+        if (!all[effectiveCat]) all[effectiveCat] = { static: [], user: [] }
+        all[effectiveCat].static.push({ ...effective, _isStatic: true })
       }
     }
-    return all
-  }, [staticCategories, userCategories])
 
-  const allItems  = [...Object.values(staticCategories).flat(), ...Object.values(userCategories).flat()]
+    // User items
+    for (const [cat, items] of Object.entries(userCategories)) {
+      if (!items?.length) continue
+      const active = items.filter(i => !deletedSet.has(i.id))
+      if (active.length) {
+        if (!all[cat]) all[cat] = { static: [], user: [] }
+        all[cat].user = [...(all[cat].user || []), ...active]
+      }
+    }
+
+    return all
+  }, [staticCategories, userCategories, deletedSet, overrides])
+
+  const allItems   = useMemo(() => Object.values(mergedCategories).flatMap(({ static: s, user: u }) => [...s, ...u]), [mergedCategories])
   const heavyCount = allItems.filter(i => i.isHeavy).length
-  const userCount  = Object.values(userCategories).flat().length
+  const userCount  = Object.values(mergedCategories).flatMap(({ user }) => user).length
 
   function openAddDrawer(category) { setDrawer({ item: null, category }) }
-  function openEditDrawer(item, category) { setDrawer({ item: { ...item, category }, category, itemCategory: category }) }
+
+  function openEditDrawer(item, category, isStatic) {
+    setDrawer({ item: { ...item, category }, category, itemCategory: category, isStatic: !!isStatic })
+  }
 
   function handleDrawerSave(newCategory, itemData) {
     if (drawer.item) {
-      const oldCat = drawer.itemCategory
-      if (newCategory !== oldCat) {
-        deleteUserItem?.(activeTraveler, oldCat, drawer.item.id)
-        addUserItem?.(activeTraveler, newCategory, itemData)
+      if (drawer.isStatic) {
+        overrideItem?.({ ...itemData, id: drawer.item.id })
       } else {
-        updateUserItem?.(activeTraveler, oldCat, drawer.item.id, itemData)
+        const oldCat = drawer.itemCategory
+        if (newCategory !== oldCat) {
+          deleteUserItem?.(activeTraveler, oldCat, drawer.item.id)
+          addUserItem?.(activeTraveler, newCategory, itemData)
+        } else {
+          updateUserItem?.(activeTraveler, oldCat, drawer.item.id, itemData)
+        }
       }
     } else {
       addUserItem?.(activeTraveler, newCategory, itemData)
@@ -66,7 +88,11 @@ export default function InventoryView({ state, addUserItem, updateUserItem, dele
 
   function handleDrawerDelete() {
     if (!drawer?.item) return
-    deleteUserItem?.(activeTraveler, drawer.itemCategory, drawer.item.id)
+    if (drawer.isStatic) {
+      deleteItem?.(drawer.item.id)
+    } else {
+      deleteUserItem?.(activeTraveler, drawer.itemCategory, drawer.item.id)
+    }
     setDrawer(null)
   }
 
@@ -100,6 +126,11 @@ export default function InventoryView({ state, addUserItem, updateUserItem, dele
         {userCount > 0 && (
           <span className="text-[13px] bg-[#f0f7f3] text-[#1B4332] rounded-full px-3 py-1">★ {userCount} custom</span>
         )}
+        {(state?.deletedItems?.length > 0 || Object.keys(overrides).length > 0) && (
+          <span className="text-[13px] bg-[#FEF3C7] text-[#92400E] rounded-full px-3 py-1">
+            {[state?.deletedItems?.length > 0 && `${state.deletedItems.length} hidden`, Object.keys(overrides).length > 0 && `${Object.keys(overrides).length} edited`].filter(Boolean).join(' · ')}
+          </span>
+        )}
       </div>
 
       <div className="flex-1 px-4 lg:px-8 pt-5 space-y-4 max-w-[1100px] mx-auto w-full">
@@ -110,8 +141,14 @@ export default function InventoryView({ state, addUserItem, updateUserItem, dele
             staticItems={staticItems || []}
             userItems={userItems || []}
             onAdd={() => openAddDrawer(cat)}
-            onEdit={(item) => openEditDrawer(item, cat)}
-            onDelete={(item) => { deleteUserItem?.(activeTraveler, cat, item.id) }}
+            onEdit={(item, isStatic) => openEditDrawer(item, cat, isStatic)}
+            onDelete={(item, isStatic) => {
+              if (isStatic) {
+                deleteItem?.(item.id)
+              } else {
+                deleteUserItem?.(activeTraveler, cat, item.id)
+              }
+            }}
           />
         ))}
       </div>
@@ -149,12 +186,79 @@ function TrashIcon() {
   )
 }
 
+function ItemRow({ item, isLast, onEdit, onDelete }) {
+  const [confirming, setConfirming] = useState(false)
+  const isStatic = !!item._isStatic
+  const isEdited = isStatic && item._wasEdited
+
+  return (
+    <div className={!isLast || confirming ? 'border-b border-[#E5E7EB]' : ''}>
+      <div className="flex items-start gap-2 px-4 py-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-medium text-[#2D2D2D]">
+            {!isStatic && <span className="text-[#95C4A1] mr-1">★</span>}
+            {item.name}
+            {item.isHeavy && <span className="ml-1 text-[11px] text-[#D97706]">⚠️</span>}
+            {item.optional && <span className="ml-1 text-[13px] text-[#9CA3AF]">(optional)</span>}
+            {item.weatherTrigger && <span className="ml-1 text-[11px] text-[#3B82F6]">🌤</span>}
+          </p>
+          {item.qty && item.qty !== 1 && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {item.qty}</p>}
+          {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
+          <div className="flex flex-wrap gap-1 mt-1">
+            {(item.conditions || []).map(c => {
+              const tt = TRIP_TYPES.find(t => t.id === c)
+              return (
+                <span key={c} className={`text-[11px] rounded px-1.5 py-0.5 ${isStatic ? 'bg-[#F3F4F6] text-[#9CA3AF]' : 'bg-[#f0f7f3] text-[#1B4332]'}`}>
+                  {tt ? tt.label : c}
+                </span>
+              )
+            })}
+          </div>
+        </div>
+        <div className="flex-none flex items-center gap-0.5 pt-0.5">
+          <button
+            onClick={() => onEdit(item, isStatic)}
+            title="Edit"
+            className="p-1.5 text-[#9CA3AF] hover:text-[#1B4332] hover:bg-[#f0f7f3] rounded-lg transition-colors"
+          >
+            <PencilIcon />
+          </button>
+          <button
+            onClick={() => setConfirming(c => !c)}
+            title="Delete"
+            className={`p-1.5 rounded-lg transition-colors ${confirming ? 'text-red-500 bg-red-50' : 'text-[#9CA3AF] hover:text-red-400 hover:bg-red-50'}`}
+          >
+            <TrashIcon />
+          </button>
+        </div>
+      </div>
+
+      {confirming && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50">
+          <p className="text-[13px] text-red-600 flex-1 truncate">Delete "{item.name}"?</p>
+          <button
+            onClick={() => { onDelete(item, isStatic); setConfirming(false) }}
+            className="text-[13px] font-semibold text-white bg-red-500 px-3 py-1 rounded-lg flex-none"
+          >
+            Delete
+          </button>
+          <button
+            onClick={() => setConfirming(false)}
+            className="text-[13px] text-[#6B7280] px-2 py-1 flex-none"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CategorySection({ cat, staticItems, userItems, onAdd, onEdit, onDelete }) {
-  const [confirmId, setConfirmId] = useState(null)
   const allCount = staticItems.length + userItems.length
   if (allCount === 0) return null
 
-  const totalRows = staticItems.length + userItems.length
+  const allRows = [...staticItems, ...userItems]
 
   return (
     <div>
@@ -162,95 +266,15 @@ function CategorySection({ cat, staticItems, userItems, onAdd, onEdit, onDelete 
         {CAT_LABELS[cat] || cat}
       </h3>
       <div className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        {staticItems.map((item, i) => (
-          <div
+        {allRows.map((item, i) => (
+          <ItemRow
             key={item.id}
-            className={`flex items-start gap-3 px-4 py-3 ${
-              i < staticItems.length - 1 || userItems.length > 0 ? 'border-b border-[#E5E7EB]' : ''
-            }`}
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-medium text-[#2D2D2D]">
-                {item.name}
-                {item.isHeavy && <span className="ml-1.5 text-[11px] text-[#D97706] font-semibold">⚠️</span>}
-                {item.optional && <span className="ml-1 text-[13px] text-[#9CA3AF]">(optional)</span>}
-              </p>
-              {item.qty && item.qty !== 1 && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {item.qty}</p>}
-              {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
-            </div>
-            <div className="flex-none flex flex-col gap-0.5 items-end">
-              {(item.conditions || []).map(c => (
-                <span key={c} className="text-[11px] bg-[#F3F4F6] text-[#9CA3AF] rounded px-1.5 py-0.5">{c}</span>
-              ))}
-            </div>
-          </div>
+            item={item}
+            isLast={i === allRows.length - 1}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         ))}
-
-        {userItems.map((item, i) => {
-          const isConfirming = confirmId === item.id
-          const isLast = i === userItems.length - 1
-          return (
-            <div key={item.id} className={!isLast || isConfirming ? 'border-b border-[#E5E7EB]' : ''}>
-              <div className="flex items-start gap-2 px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-medium text-[#2D2D2D]">
-                    <span className="text-[#95C4A1] mr-1">★</span>
-                    {item.name}
-                    {item.isHeavy && <span className="ml-1 text-[11px] text-[#D97706]">⚠️</span>}
-                    {item.optional && <span className="ml-1 text-[13px] text-[#9CA3AF]">(optional)</span>}
-                    {item.weatherTrigger && <span className="ml-1 text-[11px] text-[#3B82F6]">🌤</span>}
-                  </p>
-                  {item.qty && item.qty !== 1 && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {item.qty}</p>}
-                  {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {(item.conditions || []).map(c => {
-                      const tt = TRIP_TYPES.find(t => t.id === c)
-                      return (
-                        <span key={c} className="text-[11px] bg-[#f0f7f3] text-[#1B4332] rounded px-1.5 py-0.5">
-                          {tt ? tt.label : c}
-                        </span>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex-none flex items-center gap-0.5 pt-0.5">
-                  <button
-                    onClick={() => onEdit(item)}
-                    title="Edit"
-                    className="p-1.5 text-[#9CA3AF] hover:text-[#1B4332] hover:bg-[#f0f7f3] rounded-lg transition-colors"
-                  >
-                    <PencilIcon />
-                  </button>
-                  <button
-                    onClick={() => setConfirmId(isConfirming ? null : item.id)}
-                    title="Delete"
-                    className={`p-1.5 rounded-lg transition-colors ${isConfirming ? 'text-red-500 bg-red-50' : 'text-[#9CA3AF] hover:text-red-400 hover:bg-red-50'}`}
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              </div>
-
-              {isConfirming && (
-                <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50">
-                  <p className="text-[13px] text-red-600 flex-1 truncate">Delete "{item.name}"?</p>
-                  <button
-                    onClick={() => { onDelete(item); setConfirmId(null) }}
-                    className="text-[13px] font-semibold text-white bg-red-500 px-3 py-1 rounded-lg flex-none"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => setConfirmId(null)}
-                    className="text-[13px] text-[#6B7280] px-2 py-1 flex-none"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })}
       </div>
 
       {onAdd && (

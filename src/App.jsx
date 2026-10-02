@@ -77,6 +77,8 @@ export default function App() {
     addCustomTripType,
     deleteCustomTripType,
     softDeleteBuiltinTripType,
+    overrideItem,
+    deleteItem,
   } = useTravelStore()
 
   function handleTripCreated(id) {
@@ -131,6 +133,8 @@ export default function App() {
             addUserItem={addUserItem}
             updateUserItem={updateUserItem}
             deleteUserItem={deleteUserItem}
+            overrideItem={overrideItem}
+            deleteItem={deleteItem}
           />
         )}
 

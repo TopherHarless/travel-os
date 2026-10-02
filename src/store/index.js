@@ -54,6 +54,8 @@ function getInitialState() {
     templateOverrides: {},
     customTripTypes: [],
     deletedTripTypeIds: [],
+    itemOverrides: {},
+    deletedItems: [],
     bagsMigrationVersion: BAGS_MIGRATION_VERSION,
   }
 
@@ -79,6 +81,8 @@ function getInitialState() {
   return {
     customTripTypes: [],
     deletedTripTypeIds: [],
+    itemOverrides: {},
+    deletedItems: [],
     ...saved,
     bags: [...bags, ...missingBags],
     bagsMigrationVersion: BAGS_MIGRATION_VERSION,
@@ -261,6 +265,23 @@ export function useTravelStore() {
     }))
   }, [setState])
 
+  // ── Item Overrides / Deletions ────────────────────────────────────────────
+
+  const overrideItem = useCallback((item) => {
+    setState(s => ({
+      ...s,
+      itemOverrides: { ...(s.itemOverrides || {}), [item.id]: item },
+    }))
+  }, [setState])
+
+  const deleteItem = useCallback((id) => {
+    setState(s => {
+      const existing = new Set(s.deletedItems || [])
+      if (existing.has(id)) return s
+      return { ...s, deletedItems: [...existing, id] }
+    })
+  }, [setState])
+
   // ── Template Overrides ────────────────────────────────────────────────────
 
   const addTemplateItem = useCallback((tripTypeId, item) => {
@@ -400,5 +421,7 @@ export function useTravelStore() {
     addCustomTripType,
     deleteCustomTripType,
     softDeleteBuiltinTripType,
+    overrideItem,
+    deleteItem,
   }
 }
