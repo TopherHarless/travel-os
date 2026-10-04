@@ -128,8 +128,25 @@ export default function App() {
     deleteItem,
   } = useTravelStore()
 
-  // Auth state listener
+  // Auth state listener + handle redirect result (iOS Safari fallback)
   useEffect(() => {
+    // On iOS, signInWithPopup silently falls back to a redirect flow.
+    // We need to pick up the result when the page reloads after the redirect.
+    auth.getRedirectResult()
+      .then(result => {
+        if (result?.user) {
+          if (result.user.email !== ALLOWED_EMAIL) {
+            auth.signOut()
+            setAuthError('Access restricted.')
+          }
+        }
+      })
+      .catch(err => {
+        if (err.code !== 'auth/no-auth-event') {
+          setAuthError('Sign-in failed. Please try again.')
+        }
+      })
+
     const unsubscribe = auth.onAuthStateChanged(u => {
       setUser(u)
       setAuthLoading(false)
