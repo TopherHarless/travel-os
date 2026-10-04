@@ -117,9 +117,6 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
   const effectiveQty = qtyOverride !== undefined ? qtyOverride : (resolvedQty ?? 1)
   const isOverridden = qtyOverride !== undefined
 
-  // Show the qty pill when qty > 1 or when there's a manual override
-  const showQtyPill = effectiveQty > 1 || isOverridden
-
   if (confirming) {
     return (
       <div className={`flex items-center gap-2 px-4 py-3 bg-[#FEF2F2] ${!isLast ? 'border-b border-[#E5E7EB]' : ''}`}>
@@ -137,9 +134,10 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 min-h-[48px] ${!isLast ? 'border-b border-[#E5E7EB]' : ''}`}
+      className={`flex items-center gap-2 px-3 min-h-[48px] ${!isLast ? 'border-b border-[#E5E7EB]' : ''}`}
       style={{ backgroundColor: checked ? '#F8F6F1' : '#ffffff' }}
     >
+      {/* Checkbox */}
       <button
         onClick={onToggle}
         className={`w-5 h-5 flex-none rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -149,6 +147,7 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
         {checked && <span className="text-white font-bold" style={{ fontSize: '9px', lineHeight: 1 }}>✓</span>}
       </button>
 
+      {/* Item name + note */}
       <div className="flex-1 min-w-0 py-3">
         <p className={`text-[15px] font-medium leading-snug ${checked ? 'line-through text-[#9CA3AF]' : 'text-[#2D2D2D]'}`}>
           {item.name}
@@ -156,8 +155,8 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
         {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
       </div>
 
-      {/* Badges + qty editor */}
-      <div className="flex items-center gap-1.5 flex-none">
+      {/* Small badges (heavy, optional, weather) */}
+      <div className="flex items-center gap-1 flex-none">
         {item.isHeavy && (
           <span className="text-[11px] bg-[#FEF3C7] text-[#D97706] rounded px-1.5 py-0.5 font-medium">⚠️</span>
         )}
@@ -172,35 +171,18 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
             🌤{item.weatherSource ? ` ${item.weatherSource}` : ''}
           </span>
         )}
+      </div>
 
-        {/* Qty display (tappable) or inline stepper */}
-        {!editingQty && showQtyPill && onSetQtyOverride && (
-          <button
-            onClick={() => setEditingQty(true)}
-            title="Edit quantity"
-            className={`text-[13px] rounded px-1.5 py-0.5 font-medium transition-colors ${
-              isOverridden
-                ? 'bg-[#dcefdf] text-[#1B4332]'
-                : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
-            }`}
-          >
-            ×{effectiveQty}
-          </button>
-        )}
-        {!editingQty && showQtyPill && !onSetQtyOverride && (
-          <span className="text-[13px] text-[#6B7280] bg-[#F3F4F6] rounded px-1.5 py-0.5 font-medium">
-            ×{effectiveQty}
-          </span>
-        )}
-
-        {editingQty && (
-          <div className="flex items-center gap-0.5">
+      {/* QTY column — always visible, dedicated space */}
+      {onSetQtyOverride ? (
+        editingQty ? (
+          <div className="flex items-center gap-0.5 flex-none">
             <button
               onClick={() => {
                 const v = Math.max(1, effectiveQty - 1)
                 onSetQtyOverride(item.id, v)
               }}
-              className="w-5 h-5 rounded bg-[#F3F4F6] text-[#2D2D2D] font-bold text-xs flex items-center justify-center"
+              className="w-6 h-6 rounded bg-[#F3F4F6] text-[#2D2D2D] font-bold text-sm flex items-center justify-center"
             >−</button>
             <input
               type="number"
@@ -210,36 +192,62 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
                 const v = parseInt(e.target.value, 10)
                 if (!isNaN(v) && v >= 1) onSetQtyOverride(item.id, v)
               }}
-              className="w-8 text-center text-[12px] border border-[#D1D5DB] rounded py-0.5 font-medium"
+              className="w-9 text-center text-[13px] border border-[#95C4A1] rounded py-0.5 font-semibold text-[#1B4332]"
               style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
+              autoFocus
             />
             <button
               onClick={() => onSetQtyOverride(item.id, effectiveQty + 1)}
-              className="w-5 h-5 rounded bg-[#F3F4F6] text-[#2D2D2D] font-bold text-xs flex items-center justify-center"
+              className="w-6 h-6 rounded bg-[#F3F4F6] text-[#2D2D2D] font-bold text-sm flex items-center justify-center"
             >+</button>
             <button
               onClick={() => setEditingQty(false)}
-              className="w-5 h-5 rounded bg-[#1B4332] text-white text-xs font-bold flex items-center justify-center ml-0.5"
+              className="w-6 h-6 rounded bg-[#1B4332] text-white text-xs font-bold flex items-center justify-center ml-0.5"
             >✓</button>
             {isOverridden && (
               <button
                 onClick={() => { onSetQtyOverride(item.id, null); setEditingQty(false) }}
                 title="Reset to calculated"
-                className="text-[12px] text-[#6B7280] hover:text-[#2D2D2D] ml-0.5"
+                className="text-[12px] text-[#9CA3AF] hover:text-[#6B7280] ml-0.5"
               >↩</button>
             )}
           </div>
-        )}
-      </div>
+        ) : (
+          <button
+            onClick={() => setEditingQty(true)}
+            title="Tap to edit quantity"
+            className={`flex-none w-10 h-8 rounded-lg flex items-center justify-center font-semibold text-[14px] transition-colors ${
+              isOverridden
+                ? 'bg-[#dcefdf] text-[#1B4332] border border-[#95C4A1]'
+                : effectiveQty > 1
+                  ? 'bg-[#F3F4F6] text-[#374151] border border-[#E5E7EB] hover:bg-[#E5E7EB]'
+                  : 'bg-transparent text-[#D1D5DB] border border-dashed border-[#E5E7EB] hover:border-[#95C4A1] hover:text-[#6B7280]'
+            }`}
+          >
+            {effectiveQty}
+          </button>
+        )
+      ) : (
+        /* Read-only qty display */
+        effectiveQty > 1 ? (
+          <span className="flex-none w-10 h-8 rounded-lg flex items-center justify-center font-semibold text-[14px] bg-[#F3F4F6] text-[#374151]">
+            {effectiveQty}
+          </span>
+        ) : (
+          <span className="flex-none w-10" />
+        )
+      )}
 
+      {/* Phase selector — shown when multi-phase, styled as a clear segmented control */}
       {isMultiPhase && (
         <PhaseSelector phase={phase} onSet={onSetPhase} />
       )}
 
+      {/* Remove button */}
       {onRemove && (
         <button
           onClick={() => setConfirming(true)}
-          className="flex-none text-[#D1D5DB] hover:text-[#EF4444] transition-colors text-lg leading-none p-1 ml-0.5"
+          className="flex-none text-[#D1D5DB] hover:text-[#EF4444] transition-colors text-lg leading-none p-1"
           title="Remove item"
         >
           ×
@@ -251,20 +259,27 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
 
 function PhaseSelector({ phase, onSet }) {
   const phases = [
-    { val: '1',    label: '🟦', title: 'Phase 1 only' },
-    { val: 'both', label: '🟩', title: 'Both phases' },
-    { val: '2',    label: '🟧', title: 'Phase 2 only' },
+    { val: '1',    emoji: '🟦', label: '1', title: 'Phase 1 only' },
+    { val: 'both', emoji: '🟩', label: '·', title: 'Both phases' },
+    { val: '2',    emoji: '🟧', label: '2', title: 'Phase 2 only' },
   ]
+
+  const activePhase = phases.find(p => p.val === phase)
+
   return (
-    <div className="flex gap-1">
+    <div className="flex-none flex items-center gap-0.5 bg-[#F3F4F6] rounded-lg p-0.5" title="Tap to change trip phase">
       {phases.map(p => (
         <button
           key={p.val}
           title={p.title}
           onClick={() => onSet(p.val)}
-          className={`text-base leading-none transition-opacity ${phase === p.val ? 'opacity-100' : 'opacity-25'}`}
+          className={`w-7 h-6 rounded flex items-center justify-center text-[13px] transition-all ${
+            phase === p.val
+              ? 'bg-white shadow-sm'
+              : 'opacity-30 hover:opacity-60'
+          }`}
         >
-          {p.label}
+          {p.emoji}
         </button>
       ))}
     </div>
