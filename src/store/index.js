@@ -265,6 +265,29 @@ export function useTravelStore() {
     }))
   }, [setState])
 
+  // ── Cloud sync ───────────────────────────────────────────────────────────
+
+  const replaceAllState = useCallback((cloudData) => {
+    setState(_ => {
+      const next = {
+        travelers: DEFAULT_TRAVELERS,
+        bags: DEFAULT_BAGS,
+        trips: [],
+        settings: { defaultAirlineWeightLimit: 50 },
+        userInventory: {},
+        templateOverrides: {},
+        customTripTypes: [],
+        deletedTripTypeIds: [],
+        itemOverrides: {},
+        deletedItems: [],
+        bagsMigrationVersion: BAGS_MIGRATION_VERSION,
+        ...cloudData,
+      }
+      saveState(next)
+      return next
+    })
+  }, [setState])
+
   // ── Item Overrides / Deletions ────────────────────────────────────────────
 
   const overrideItem = useCallback((item) => {
@@ -395,6 +418,7 @@ export function useTravelStore() {
 
   return {
     state,
+    replaceAllState,
     addTrip,
     updateTrip,
     deleteTrip,
