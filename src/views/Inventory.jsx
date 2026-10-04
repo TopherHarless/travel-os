@@ -166,6 +166,19 @@ export default function InventoryView({ state, addUserItem, updateUserItem, dele
   )
 }
 
+function formatQtyDisplay(qty) {
+  if (qty === undefined || qty === null) return null
+  if (typeof qty === 'number') return qty !== 1 ? `×${qty}` : null
+  if (typeof qty === 'string') return qty
+  if (qty.rule === 'fixed') return qty.value !== undefined && qty.value !== 1 ? `×${qty.value}` : null
+  const labels = {
+    per_day: 'per day', per_day_plus_one: 'per day +1', per_week: 'per week',
+    per_traveler: 'per traveler', per_suit_day: 'per suit day',
+    custom: qty.value || 'custom',
+  }
+  return labels[qty.rule] || null
+}
+
 function PencilIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -202,7 +215,7 @@ function ItemRow({ item, isLast, onEdit, onDelete }) {
             {item.optional && <span className="ml-1 text-[13px] text-[#9CA3AF]">(optional)</span>}
             {item.weatherTrigger && <span className="ml-1 text-[11px] text-[#3B82F6]">🌤</span>}
           </p>
-          {item.qty && item.qty !== 1 && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {item.qty}</p>}
+          {formatQtyDisplay(item.qty) && <p className="text-[13px] text-[#6B7280] mt-0.5">Qty: {formatQtyDisplay(item.qty)}</p>}
           {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
           <div className="flex flex-wrap gap-1 mt-1">
             {(item.conditions || []).map(c => {

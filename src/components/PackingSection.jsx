@@ -20,7 +20,7 @@ const TRAVELER_LABELS = {
   topher: 'Topher', lanita: 'La Nita', crosby: 'Crosby', penn: 'Penn', shared: 'Shared'
 }
 
-export default function PackingSection({ travelerId, categories, checkedItems, onToggle, isMultiPhase, itemPhases, onSetPhase, onRemoveItem, onAddItem }) {
+export default function PackingSection({ travelerId, categories, checkedItems, onToggle, isMultiPhase, itemPhases, onSetPhase, onRemoveItem, onAddItem, qtyOverrides, onSetQtyOverride }) {
   const allItems = Object.values(categories).flat()
   const heavyItems = allItems.filter(i => i.isHeavy)
   const checkedCount = allItems.filter(i => checkedItems[i.id]).length
@@ -62,6 +62,8 @@ export default function PackingSection({ travelerId, categories, checkedItems, o
           itemPhases={itemPhases}
           onSetPhase={onSetPhase}
           onRemoveItem={onRemoveItem}
+          qtyOverrides={qtyOverrides}
+          onSetQtyOverride={onSetQtyOverride}
         />
       ))}
 
@@ -78,7 +80,7 @@ export default function PackingSection({ travelerId, categories, checkedItems, o
   )
 }
 
-function CategorySection({ category, items, checkedItems, onToggle, isMultiPhase, itemPhases, onSetPhase, onRemoveItem }) {
+function CategorySection({ category, items, checkedItems, onToggle, isMultiPhase, itemPhases, onSetPhase, onRemoveItem, qtyOverrides, onSetQtyOverride }) {
   if (!items?.length) return null
 
   return (
@@ -98,6 +100,8 @@ function CategorySection({ category, items, checkedItems, onToggle, isMultiPhase
             isMultiPhase={isMultiPhase}
             phase={itemPhases?.[item.id] || 'both'}
             onSetPhase={phase => onSetPhase?.(item.id, phase)}
+            qtyOverride={qtyOverrides?.[item.id]}
+            onSetQtyOverride={onSetQtyOverride}
           />
         ))}
       </div>
@@ -105,11 +109,16 @@ function CategorySection({ category, items, checkedItems, onToggle, isMultiPhase
   )
 }
 
-function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, phase, onSetPhase }) {
+function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, phase, onSetPhase, qtyOverride, onSetQtyOverride }) {
   const [confirming, setConfirming] = useState(false)
+  const [editingQty, setEditingQty] = useState(false)
 
-  const qty = item.resolvedQty
-  const qtyStr = qty !== undefined && qty !== 1 ? `×${qty}` : ''
+  const resolvedQty = item.resolvedQty
+  const effectiveQty = qtyOverride !== undefined ? qtyOverride : (resolvedQty ?? 1)
+  const isOverridden = qtyOverride !== undefined
+
+  // Show the qty pill when qty > 1 or when there's a manual override
+  const showQtyPill = effectiveQty > 1 || isOverridden
 
   if (confirming) {
     return (
@@ -147,11 +156,8 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
         {item.note && <p className="text-[13px] text-[#6B7280] mt-0.5">{item.note}</p>}
       </div>
 
-      {/* Badges */}
+      {/* Badges + qty editor */}
       <div className="flex items-center gap-1.5 flex-none">
-        {qtyStr && (
-          <span className="text-[13px] text-[#6B7280] bg-[#F3F4F6] rounded px-1.5 py-0.5 font-medium">{qtyStr}</span>
-        )}
         {item.isHeavy && (
           <span className="text-[11px] bg-[#FEF3C7] text-[#D97706] rounded px-1.5 py-0.5 font-medium">⚠️</span>
         )}
@@ -165,6 +171,64 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
           >
             🌤{item.weatherSource ? ` ${item.weatherSource}` : ''}
           </span>
+        )}
+
+        {/* Qty display (tappable) or inline stepper */}
+        {!editingQty && showQtyPill && onSetQtyOverride && (
+          <button
+            onClick={() => setEditingQty(true)}
+            title="Edit quantity"
+            className={`text-[13px] rounded px-1.5 py-0.5 font-medium transition-colors ${
+              isOverridden
+                ? 'bg-[#dcefdf] text-[#1B4332]'
+                : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
+            }`}
+          >
+            ×{effectiveQty}
+          </button>
+        )}
+        {!editingQty && showQtyPill && !onSetQtyOverride && (
+          <span className="text-[13px] text-[#6B7280] bg-[#F3F4F6] rounded px-1.5 py-0.5 font-medium">
+            ×{effectiveQty}
+          </span>
+        )}
+
+        {editingQty && (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => {
+                const v = Math.max(1, effectiveQty - 1)
+                onSetQtyOverride(item.id, v)
+              }}
+              className="w-5 h-5 rounded bg-[#F3F4F6] text-[#2D2D2D] font-bold text-xs flex items-center justify-center"
+            >−</button>
+            <input
+              type="number"
+              min="1"
+              value={effectiveQty}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v) && v >= 1) onSetQtyOverride(item.id, v)
+              }}
+              className="w-8 text-center text-[12px] border border-[#D1D5DB] rounded py-0.5 font-medium"
+              style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
+            />
+            <button
+              onClick={() => onSetQtyOverride(item.id, effectiveQty + 1)}
+              className="w-5 h-5 rounded bg-[#F3F4F6] text-[#2D2D2D] font-bold text-xs flex items-center justify-center"
+            >+</button>
+            <button
+              onClick={() => setEditingQty(false)}
+              className="w-5 h-5 rounded bg-[#1B4332] text-white text-xs font-bold flex items-center justify-center ml-0.5"
+            >✓</button>
+            {isOverridden && (
+              <button
+                onClick={() => { onSetQtyOverride(item.id, null); setEditingQty(false) }}
+                title="Reset to calculated"
+                className="text-[12px] text-[#6B7280] hover:text-[#2D2D2D] ml-0.5"
+              >↩</button>
+            )}
+          </div>
         )}
       </div>
 

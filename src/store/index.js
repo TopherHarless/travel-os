@@ -108,6 +108,7 @@ export function useTravelStore() {
       id: `trip-${Date.now()}`,
       checkedItems: {},
       checkedTasks: {},
+      qtyOverrides: {},
       isArchived: false,
       createdAt: new Date().toISOString().split('T')[0],
       ...trip,

@@ -42,6 +42,7 @@ export function buildTripConfig(trip, travelers) {
     isMIPCOM,
     suitEvent5Day: suitDays >= 5,
     days,
+    travelerCount: trip.selectedTravelers?.length ?? 1,
     suitDays,
     dressShirtDays,
     hasFormalDays: suitDays > 0 || dressShirtDays > 0,
@@ -64,6 +65,19 @@ export function buildTripConfig(trip, travelers) {
 
 // Resolve a quantity key to a human-readable string or number
 export function resolveQty(key, cfg) {
+  // Rule-object qty: { rule: 'per_day', value: null } or { rule: 'fixed', value: 3 }
+  if (key && typeof key === 'object' && key.rule) {
+    switch (key.rule) {
+      case 'fixed':            return key.value ?? 1
+      case 'per_day':          return cfg.days ?? 1
+      case 'per_day_plus_one': return (cfg.days ?? 1) + 1
+      case 'per_week':         return Math.ceil((cfg.days ?? 1) / 7)
+      case 'per_traveler':     return cfg.travelerCount ?? 1
+      case 'per_suit_day':     return cfg.suitDays ?? 0
+      case 'custom':           return resolveQty(key.value, cfg)
+      default:                 return key.value ?? 1
+    }
+  }
   if (typeof key === 'number') return key
   switch (key) {
     case 'compressionSocks':   return cfg.travelDays

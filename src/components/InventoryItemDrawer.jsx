@@ -4,6 +4,23 @@ import ConditionSelect from './ConditionSelect.jsx'
 
 const VALID_CONDITIONS = new Set(['always', ...TRIP_TYPES.map(t => t.id)])
 
+const QTY_RULES = [
+  { val: 'fixed',            label: 'Fixed number' },
+  { val: 'per_day',          label: '1 per trip day' },
+  { val: 'per_day_plus_one', label: '1 per day + 1 extra' },
+  { val: 'per_week',         label: '1 per 7 days (rounded up)' },
+  { val: 'per_traveler',     label: '1 per traveler' },
+  { val: 'per_suit_day',     label: '1 per suit day' },
+  { val: 'custom',           label: 'Custom resolver key' },
+]
+
+function normalizeQty(qty) {
+  if (qty && typeof qty === 'object' && qty.rule) return qty
+  if (typeof qty === 'number') return { rule: 'fixed', value: qty }
+  if (typeof qty === 'string') return { rule: 'custom', value: qty }
+  return { rule: 'fixed', value: 1 }
+}
+
 function normalizeConditions(conds) {
   if (!conds?.length) return ['always']
   const filtered = conds.filter(c => VALID_CONDITIONS.has(c))
@@ -39,14 +56,14 @@ export default function InventoryItemDrawer({ item, defaultCategory = 'clothing'
     name:           item.name,
     category:       item.category || defaultCategory,
     conditions:     normalizeConditions(item.conditions),
-    qty:            item.qty ?? 1,
+    qty:            normalizeQty(item.qty),
     note:           item.note || '',
     isHeavy:        item.isHeavy || false,
     optional:       item.optional || false,
     weatherTrigger: item.weatherTrigger || null,
   } : {
     name: '', category: defaultCategory, conditions: ['always'],
-    qty: 1, note: '', isHeavy: false, optional: false, weatherTrigger: null,
+    qty: { rule: 'fixed', value: 1 }, note: '', isHeavy: false, optional: false, weatherTrigger: null,
   })
 
   function setField(key, val) { setForm(f => ({ ...f, [key]: val })) }
@@ -56,7 +73,7 @@ export default function InventoryItemDrawer({ item, defaultCategory = 'clothing'
     onSave(form.category, {
       name:           form.name.trim(),
       conditions:     form.conditions.length ? form.conditions : ['always'],
-      qty:            isNaN(Number(form.qty)) ? String(form.qty) : Number(form.qty),
+      qty:            form.qty,
       note:           form.note.trim() || undefined,
       isHeavy:        form.isHeavy,
       optional:       form.optional,
@@ -96,21 +113,40 @@ export default function InventoryItemDrawer({ item, defaultCategory = 'clothing'
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">Category</label>
-              <select value={form.category} onChange={e => setField('category', e.target.value)} className="input">
-                {CAT_OPTIONS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">Quantity</label>
-              <input
-                value={form.qty}
-                onChange={e => setField('qty', e.target.value)}
-                placeholder="1"
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-1 block">Category</label>
+            <select value={form.category} onChange={e => setField('category', e.target.value)} className="input">
+              {CAT_OPTIONS.map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-600 mb-2 block">Quantity</label>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={form.qty.rule}
+                onChange={e => setField('qty', { rule: e.target.value, value: form.qty.value })}
                 className="input"
-              />
+              >
+                {QTY_RULES.map(r => <option key={r.val} value={r.val}>{r.label}</option>)}
+              </select>
+              {form.qty.rule === 'fixed' && (
+                <input
+                  type="number"
+                  min="1"
+                  value={form.qty.value ?? 1}
+                  onChange={e => setField('qty', { rule: 'fixed', value: parseInt(e.target.value, 10) || 1 })}
+                  className="input"
+                />
+              )}
+              {form.qty.rule === 'custom' && (
+                <input
+                  value={form.qty.value ?? ''}
+                  onChange={e => setField('qty', { rule: 'custom', value: e.target.value })}
+                  placeholder="e.g. dressShirts"
+                  className="input"
+                />
+              )}
             </div>
           </div>
 

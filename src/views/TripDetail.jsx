@@ -177,6 +177,15 @@ const BAG_OWNER_LABELS = { topher: 'Topher', lanita: 'La Nita', penn: 'Penn', cr
 const TRAVELER_ORDER = ['topher', 'lanita', 'crosby', 'penn']
 
 export default function TripDetailView({ state, tripId, onBack, toggleItem, toggleTask, setItemPhase, archiveTrip, updateTrip, addTripItem, removeTripItem, restoreTripItem, addUserItem }) {
+  function setQtyOverride(itemId, qty) {
+    const current = trip?.qtyOverrides || {}
+    if (qty === null) {
+      const { [itemId]: _removed, ...rest } = current
+      updateTrip(tripId, { qtyOverrides: rest })
+    } else {
+      updateTrip(tripId, { qtyOverrides: { ...current, [itemId]: qty } })
+    }
+  }
   const [tab, setTab] = useState('Tasks')
   const [showExport, setShowExport] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -561,6 +570,8 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
                     onSetPhase={(itemId, phase) => setItemPhase(trip.id, itemId, phase)}
                     onRemoveItem={removeTripItem ? itemId => removeTripItem(trip.id, itemId) : undefined}
                     onAddItem={addTripItem ? travelerId => setDrawerTraveler(travelerId) : undefined}
+                    qtyOverrides={trip.qtyOverrides || {}}
+                    onSetQtyOverride={setQtyOverride}
                   />
                 )
               })}
