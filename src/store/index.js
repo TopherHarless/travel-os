@@ -157,6 +157,45 @@ export function useTravelStore() {
     }))
   }, [setState])
 
+  const addCustomTask = useCallback((tripId, section, text) => {
+    setState(s => ({
+      ...s,
+      trips: s.trips.map(t => {
+        if (t.id !== tripId) return t
+        const id = `custom-${section}-${Date.now()}`
+        const tasks = [...(t.customTasks || []), { id, section, text }]
+        return { ...t, customTasks: tasks }
+      }),
+    }))
+  }, [setState])
+
+  const updateCustomTask = useCallback((tripId, taskId, text) => {
+    setState(s => ({
+      ...s,
+      trips: s.trips.map(t => {
+        if (t.id !== tripId) return t
+        const tasks = (t.customTasks || []).map(tk => tk.id === taskId ? { ...tk, text } : tk)
+        return { ...t, customTasks: tasks }
+      }),
+    }))
+  }, [setState])
+
+  const deleteTask = useCallback((tripId, taskId) => {
+    setState(s => ({
+      ...s,
+      trips: s.trips.map(t => {
+        if (t.id !== tripId) return t
+        // For custom tasks, remove from array; for generated tasks, add to deletedTaskIds
+        const isCustom = (t.customTasks || []).some(tk => tk.id === taskId)
+        if (isCustom) {
+          return { ...t, customTasks: (t.customTasks || []).filter(tk => tk.id !== taskId) }
+        }
+        const deletedTaskIds = [...(t.deletedTaskIds || []), taskId]
+        return { ...t, deletedTaskIds }
+      }),
+    }))
+  }, [setState])
+
   const setItemPhase = useCallback((tripId, itemId, phase) => {
     setState(s => ({
       ...s,
@@ -426,6 +465,9 @@ export function useTravelStore() {
     archiveTrip,
     toggleItem,
     toggleTask,
+    addCustomTask,
+    updateCustomTask,
+    deleteTask,
     setItemPhase,
     updateTraveler,
     addBag,

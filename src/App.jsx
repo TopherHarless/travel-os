@@ -140,6 +140,9 @@ export default function App() {
     addUserItem,
     updateUserItem,
     deleteUserItem,
+    addCustomTask,
+    updateCustomTask,
+    deleteTask,
     addTripItem,
     removeTripItem,
     restoreTripItem,
@@ -310,6 +313,9 @@ export default function App() {
             setItemPhase={setItemPhase}
             archiveTrip={archiveTrip}
             updateTrip={updateTrip}
+            addCustomTask={addCustomTask}
+            updateCustomTask={updateCustomTask}
+            deleteTask={deleteTask}
             addTripItem={addTripItem}
             removeTripItem={removeTripItem}
             restoreTripItem={restoreTripItem}

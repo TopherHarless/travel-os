@@ -176,7 +176,7 @@ const TRAVELER_LABELS = { topher: 'Topher', lanita: 'La Nita', crosby: 'Crosby',
 const BAG_OWNER_LABELS = { topher: 'Topher', lanita: 'La Nita', penn: 'Penn', crosby: 'Crosby' }
 const TRAVELER_ORDER = ['topher', 'lanita', 'crosby', 'penn']
 
-export default function TripDetailView({ state, tripId, onBack, toggleItem, toggleTask, setItemPhase, archiveTrip, updateTrip, addTripItem, removeTripItem, restoreTripItem, addUserItem }) {
+export default function TripDetailView({ state, tripId, onBack, toggleItem, toggleTask, setItemPhase, archiveTrip, updateTrip, addTripItem, removeTripItem, restoreTripItem, addUserItem, addCustomTask, updateCustomTask, deleteTask }) {
   function setQtyOverride(itemId, qty) {
     const current = trip?.qtyOverrides || {}
     if (qty === null) {
@@ -454,33 +454,35 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
                 )
               })()}
 
-              {preTripTasks.length > 0 && (
-                <TaskGroup
-                  title="Pre-Trip Tasks"
-                  tasks={preTripTasks}
-                  checked={trip.checkedTasks || {}}
-                  onToggle={id => toggleTask(trip.id, id)}
-                />
-              )}
-              {day1Tasks.length > 0 && (
-                <TaskGroup
-                  title="Day 1 Tasks"
-                  tasks={day1Tasks}
-                  checked={trip.checkedTasks || {}}
-                  onToggle={id => toggleTask(trip.id, id)}
-                />
-              )}
-              {repackTasks?.length > 0 && (
-                <TaskGroup
-                  title="🔄 Repack Plan — Phase Transition"
-                  tasks={repackTasks}
-                  checked={trip.checkedTasks || {}}
-                  onToggle={id => toggleTask(trip.id, id)}
-                />
-              )}
-              {preTripTasks.length === 0 && day1Tasks.length === 0 && !repackTasks?.length && (
-                <p className="text-center text-[#6B7280] text-sm py-8">No tasks generated for this trip type</p>
-              )}
+              {(() => {
+                const deleted = new Set(trip.deletedTaskIds || [])
+                const customTasks = trip.customTasks || []
+                const checked = trip.checkedTasks || {}
+                const sharedProps = {
+                  checked,
+                  onToggle: id => toggleTask(trip.id, id),
+                  onDelete: deleteTask ? id => deleteTask(trip.id, id) : null,
+                  onEditTask: updateCustomTask ? (id, text) => updateCustomTask(trip.id, id, text) : null,
+                  onAddTask: addCustomTask ? (section, text) => addCustomTask(trip.id, section, text) : null,
+                  isArchived: !!trip.isArchived,
+                }
+                const filteredPre = preTripTasks.filter(t => !deleted.has(t.id))
+                const filteredDay1 = day1Tasks.filter(t => !deleted.has(t.id))
+                const filteredRepack = (repackTasks || []).filter(t => !deleted.has(t.id))
+                const customPre = customTasks.filter(t => t.section === 'pre')
+                const customDay1 = customTasks.filter(t => t.section === 'day1')
+                const customRepack = customTasks.filter(t => t.section === 'repack')
+                return (<>
+                  <TaskGroup title="Pre-Trip Tasks" tasks={[...filteredPre, ...customPre]} section="pre" {...sharedProps} />
+                  <TaskGroup title="Day 1 Tasks" tasks={[...filteredDay1, ...customDay1]} section="day1" {...sharedProps} />
+                  {(filteredRepack.length > 0 || customRepack.length > 0) && (
+                    <TaskGroup title="🔄 Repack Plan — Phase Transition" tasks={[...filteredRepack, ...customRepack]} section="repack" {...sharedProps} />
+                  )}
+                  {filteredPre.length === 0 && filteredDay1.length === 0 && !filteredRepack.length && customTasks.length === 0 && (
+                    <p className="text-center text-[#6B7280] text-sm py-8">No tasks generated for this trip type</p>
+                  )}
+                </>)
+              })()}
               {!trip.isArchived && (
                 <button
                   onClick={() => archiveTrip(trip.id)}
@@ -695,8 +697,27 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
   )
 }
 
-function TaskGroup({ title, tasks, checked, onToggle }) {
+function TaskGroup({ title, tasks, section, checked, onToggle, onDelete, onEditTask, onAddTask, isArchived }) {
+  const [addingText, setAddingText] = useState('')
+  const [isAdding, setIsAdding] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editingText, setEditingText] = useState('')
+
   const doneCount = tasks.filter(t => checked[t.id]).length
+
+  function submitAdd() {
+    const t = addingText.trim()
+    if (t && onAddTask) { onAddTask(section, t) }
+    setAddingText('')
+    setIsAdding(false)
+  }
+
+  function submitEdit() {
+    const t = editingText.trim()
+    if (t && onEditTask) onEditTask(editingId, t)
+    setEditingId(null)
+  }
+
   return (
     <div>
       <h3 className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#6B7280] mb-2">
@@ -704,19 +725,79 @@ function TaskGroup({ title, tasks, checked, onToggle }) {
       </h3>
       <div className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         {tasks.map((task, i) => (
-          <button
+          <div
             key={task.id}
-            onClick={() => onToggle(task.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 text-left ${i < tasks.length - 1 ? 'border-b border-[#E5E7EB]' : ''} active:bg-[#F8F6F1] transition-colors`}
+            className={`flex items-center gap-2 px-3 min-h-[52px] ${i < tasks.length - 1 || isAdding || !isArchived ? 'border-b border-[#E5E7EB]' : ''}`}
           >
-            <span className={`w-6 h-6 flex-none rounded-full border-2 flex items-center justify-center transition-colors ${checked[task.id] ? 'bg-[#1B4332] border-[#1B4332]' : 'border-[#D1D5DB]'}`}>
-              {checked[task.id] && <span className="text-white text-xs font-bold">✓</span>}
-            </span>
-            <span className={`text-[15px] font-medium ${checked[task.id] ? 'line-through text-[#9CA3AF]' : 'text-[#2D2D2D]'}`}>
-              {task.text}
-            </span>
-          </button>
+            {editingId === task.id ? (
+              <>
+                <input
+                  autoFocus
+                  value={editingText}
+                  onChange={e => setEditingText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') submitEdit(); if (e.key === 'Escape') setEditingId(null) }}
+                  className="flex-1 text-[15px] border border-[#95C4A1] rounded-lg px-3 py-1.5 outline-none"
+                />
+                <button onClick={submitEdit} className="text-[13px] font-semibold text-[#1B4332] px-2 py-1">Save</button>
+                <button onClick={() => setEditingId(null)} className="text-[13px] text-[#9CA3AF] px-1 py-1">✕</button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => onToggle(task.id)}
+                  className={`w-6 h-6 flex-none rounded-full border-2 flex items-center justify-center transition-colors ${checked[task.id] ? 'bg-[#1B4332] border-[#1B4332]' : 'border-[#D1D5DB]'}`}
+                >
+                  {checked[task.id] && <span className="text-white text-xs font-bold">✓</span>}
+                </button>
+                <span
+                  className={`flex-1 text-[15px] font-medium py-3 ${checked[task.id] ? 'line-through text-[#9CA3AF]' : 'text-[#2D2D2D]'}`}
+                  onClick={() => onToggle(task.id)}
+                >
+                  {task.text}
+                </span>
+                {!isArchived && (
+                  <div className="flex items-center gap-1 flex-none">
+                    <button
+                      onClick={() => { setEditingId(task.id); setEditingText(task.text) }}
+                      className="w-7 h-7 flex items-center justify-center text-[#9CA3AF] hover:text-[#1B4332] text-sm rounded"
+                      title="Edit task"
+                    >✎</button>
+                    <button
+                      onClick={() => onDelete && onDelete(task.id)}
+                      className="w-7 h-7 flex items-center justify-center text-[#9CA3AF] hover:text-[#EF4444] text-lg leading-none rounded"
+                      title="Delete task"
+                    >×</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         ))}
+
+        {/* Add task row */}
+        {!isArchived && onAddTask && (
+          isAdding ? (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <input
+                autoFocus
+                value={addingText}
+                onChange={e => setAddingText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') submitAdd(); if (e.key === 'Escape') { setIsAdding(false); setAddingText('') } }}
+                placeholder="New task…"
+                className="flex-1 text-[15px] border border-[#95C4A1] rounded-lg px-3 py-1.5 outline-none"
+              />
+              <button onClick={submitAdd} className="text-[13px] font-semibold text-[#1B4332] px-2 py-1">Add</button>
+              <button onClick={() => { setIsAdding(false); setAddingText('') }} className="text-[13px] text-[#9CA3AF] px-1">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="w-full flex items-center gap-2 px-4 py-3 text-[14px] text-[#95C4A1] hover:text-[#1B4332] hover:bg-[#F8F6F1] transition-colors"
+            >
+              <span className="text-lg leading-none">+</span> Add task
+            </button>
+          )
+        )}
       </div>
     </div>
   )
