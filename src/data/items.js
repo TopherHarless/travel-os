@@ -12,7 +12,7 @@ export const TOPHER_CLOTHING = [
   { id: 't-dress-shirts',    name: 'Dress Shirts (White ×2, Blue ×2, Patterned ×1, Extra ×1)', isHeavy: false, conditions: ['hasFormalDays'], qty: 'dressShirts' },
   { id: 't-ties',            name: 'Ties (3–4)',                       isHeavy: false, conditions: ['hasFormalDays'], qty: 'tiesTotal' },
   { id: 't-white-undershirts',name: 'White Undershirts',               isHeavy: false, conditions: ['hasFormalDays'], qty: 'formalDaysPlusOne' },
-  { id: 't-dress-socks',     name: 'Dress Socks (brown)',              isHeavy: false, conditions: ['isMIPCOM'],    qty: 4 },
+  { id: 't-dress-socks',     name: 'Dress Socks',                      isHeavy: false, conditions: ['hasFormalDays'], qty: 'formalDaysPlusOne' },
   { id: 't-black-belt',      name: 'Black Belt',                       isHeavy: false, conditions: ['isBusiness'],  qty: 1 },
   { id: 't-brown-belt',      name: 'Brown Belt',                       isHeavy: false, conditions: ['isBusiness'],  qty: 1 },
   { id: 't-collar-stays',    name: 'Collar Stays',                     isHeavy: false, conditions: ['isMIPCOM'],    qty: 1 },
