@@ -274,6 +274,13 @@ export default function App() {
     <div className="flex min-h-screen bg-[#F8F6F1]">
       <Sidebar currentView={navView} setView={setView} user={user} onSignOut={handleSignOut} syncStatus={syncStatus} />
 
+      {/* Temporary UID display — remove after debugging */}
+      {user && (
+        <div className="lg:hidden fixed top-3 left-3 z-50 bg-black text-white text-[10px] font-mono rounded px-2 py-1 opacity-70">
+          uid: {user.uid.slice(0, 12)}…
+        </div>
+      )}
+
       {/* Mobile sync indicator — only visible on small screens */}
       {syncStatus && (
         <div className="lg:hidden fixed top-3 right-3 z-50 bg-white border border-[#E5E7EB] rounded-full px-3 py-1.5 shadow-sm">
