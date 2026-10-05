@@ -111,8 +111,6 @@ export default function App() {
   const [authError, setAuthError] = useState(null)
   const [signingIn, setSigningIn] = useState(false)
   const [syncStatus, setSyncStatus] = useState(null) // null | 'saving' | 'saved' | 'error'
-  const [debugLog, setDebugLog] = useState([])
-  const [showDebug, setShowDebug] = useState(false)
   const syncTimeoutRef = useRef(null)
   const justLoadedFromCloud = useRef(false)
 
@@ -189,34 +187,18 @@ export default function App() {
 
     // Track whether the first snapshot has been received (to avoid seeding over existing data)
     let firstSnapshot = true
-    setDebugLog(prev => [...prev, `[${new Date().toISOString()}] Starting Firestore listener for uid: ${user.uid.slice(0,8)}...`])
-
     const unsubscribe = db.collection('travelos_users').doc(user.uid)
       .onSnapshot({ includeMetadataChanges: true }, doc => {
-        // Skip snapshots that are still pending local write (not yet confirmed by server)
-        // Also skip snapshots served from local cache (fromCache=true means offline/stale)
         const isPending = doc.metadata.hasPendingWrites
         const isFromCache = doc.metadata.fromCache
-        const exists = doc.exists()
 
-        const msg = `[${new Date().toISOString()}] snapshot: exists=${exists} pending=${isPending} fromCache=${isFromCache} first=${firstSnapshot}`
-        setDebugLog(prev => [...prev.slice(-9), msg])
-
-        // Only apply data when it's a confirmed server snapshot (not pending, not from cache)
-        if (exists) {
+        if (doc.exists()) {
           if (!isPending && !isFromCache) {
-            // Data confirmed from server — apply to local state
-            setDebugLog(prev => [...prev.slice(-9), `✅ APPLYING server data (trips: ${doc.data()?.trips?.length ?? 0})`])
             justLoadedFromCloud.current = true
             replaceAllState(doc.data())
-          } else {
-            setDebugLog(prev => [...prev.slice(-9), `⏭ SKIPPED (pending=${isPending} cache=${isFromCache})`])
           }
         } else if (firstSnapshot) {
-          // Doc doesn't exist yet — only seed if this is the very first snapshot
-          // and only if we actually have trips to seed (don't overwrite with empty state)
           const currentState = sanitizeForFirestore(state)
-          setDebugLog(prev => [...prev.slice(-9), `⚠️ Doc missing. Local trips: ${currentState.trips?.length ?? 0}`])
           if (currentState.trips?.length > 0) {
             db.collection('travelos_users').doc(user.uid)
               .set(currentState)
@@ -224,11 +206,7 @@ export default function App() {
           }
         }
         firstSnapshot = false
-      }, err => {
-        const msg = `❌ Firestore error: ${err.code} ${err.message}`
-        setDebugLog(prev => [...prev.slice(-9), msg])
-        console.error('Firestore sync error:', err)
-      })
+      }, err => console.error('Firestore sync error:', err))
 
     return unsubscribe
   }, [user?.uid]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -303,19 +281,6 @@ export default function App() {
         </div>
       )}
 
-      {/* DEBUG OVERLAY — tap bottom-left corner to toggle */}
-      <button
-        onClick={() => setShowDebug(v => !v)}
-        className="fixed bottom-20 left-2 z-[100] w-8 h-8 rounded-full bg-black opacity-20 text-white text-xs"
-        title="Toggle debug"
-      >🐛</button>
-      {showDebug && (
-        <div className="fixed inset-x-2 bottom-24 z-[100] bg-black text-green-400 text-[10px] font-mono rounded-xl p-3 max-h-64 overflow-y-auto" style={{ opacity: 0.95 }}>
-          <p className="text-white font-bold mb-1">Firestore Debug — uid: {user?.uid?.slice(0,8)}</p>
-          {debugLog.length === 0 && <p className="text-gray-500">No events yet</p>}
-          {debugLog.map((line, i) => <p key={i} className="leading-relaxed">{line}</p>)}
-        </div>
-      )}
 
       <div className="flex-1 lg:ml-[220px] flex flex-col min-h-screen min-w-0">
         {view === 'home' && (
