@@ -25,11 +25,28 @@ function sanitizeForFirestore(state) {
   return JSON.parse(JSON.stringify(state))
 }
 
-function Sidebar({ currentView, setView, user, onSignOut }) {
+function SyncBadge({ status }) {
+  if (!status) return null
+  const map = {
+    saving: { label: 'Saving…', color: 'text-[#6B7280]', dot: 'bg-[#9CA3AF] animate-pulse' },
+    saved:  { label: 'Saved',   color: 'text-[#1B4332]', dot: 'bg-[#95C4A1]' },
+    error:  { label: 'Sync error', color: 'text-[#EF4444]', dot: 'bg-[#EF4444]' },
+  }
+  const { label, color, dot } = map[status]
+  return (
+    <div className={`flex items-center gap-1.5 text-[11px] font-medium ${color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-none ${dot}`} />
+      {label}
+    </div>
+  )
+}
+
+function Sidebar({ currentView, setView, user, onSignOut, syncStatus }) {
   return (
     <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 w-[220px] bg-white border-r border-[#E5E7EB] z-40">
-      <div className="px-5 h-16 flex items-center border-b border-[#E5E7EB]">
+      <div className="px-5 h-16 flex items-center justify-between border-b border-[#E5E7EB]">
         <span className="text-xl font-bold text-[#1B4332] tracking-tight">Travel OS</span>
+        <SyncBadge status={syncStatus} />
       </div>
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(item => (
@@ -93,7 +110,17 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
   const [signingIn, setSigningIn] = useState(false)
+  const [syncStatus, setSyncStatus] = useState(null) // null | 'saving' | 'saved' | 'error'
+  const syncTimeoutRef = useRef(null)
   const justLoadedFromCloud = useRef(false)
+
+  function showSyncStatus(status) {
+    setSyncStatus(status)
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current)
+    if (status === 'saved' || status === 'error') {
+      syncTimeoutRef.current = setTimeout(() => setSyncStatus(null), 2500)
+    }
+  }
 
   const {
     state,
@@ -196,10 +223,12 @@ export default function App() {
       justLoadedFromCloud.current = false
       return
     }
+    showSyncStatus('saving')
     const timer = setTimeout(() => {
       db.collection('travelos_users').doc(user.uid)
         .set(sanitizeForFirestore(state))
-        .catch(console.error)
+        .then(() => showSyncStatus('saved'))
+        .catch(err => { console.error(err); showSyncStatus('error') })
     }, 1000)
     return () => clearTimeout(timer)
   }, [state, user]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -248,7 +277,14 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F1]">
-      <Sidebar currentView={navView} setView={setView} user={user} onSignOut={handleSignOut} />
+      <Sidebar currentView={navView} setView={setView} user={user} onSignOut={handleSignOut} syncStatus={syncStatus} />
+
+      {/* Mobile sync indicator — only visible on small screens */}
+      {syncStatus && (
+        <div className="lg:hidden fixed top-3 right-3 z-50 bg-white border border-[#E5E7EB] rounded-full px-3 py-1.5 shadow-sm">
+          <SyncBadge status={syncStatus} />
+        </div>
+      )}
 
       <div className="flex-1 lg:ml-[220px] flex flex-col min-h-screen min-w-0">
         {view === 'home' && (

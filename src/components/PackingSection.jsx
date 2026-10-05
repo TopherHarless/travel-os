@@ -186,12 +186,14 @@ function PackingItem({ item, checked, onToggle, onRemove, isLast, isMultiPhase, 
             >−</button>
             <input
               type="number"
+              inputMode="numeric"
               min="1"
               value={effectiveQty}
               onChange={e => {
                 const v = parseInt(e.target.value, 10)
                 if (!isNaN(v) && v >= 1) onSetQtyOverride(item.id, v)
               }}
+              onFocus={e => e.target.select()}
               className="w-9 text-center text-[13px] border border-[#95C4A1] rounded py-0.5 font-semibold text-[#1B4332]"
               style={{ MozAppearance: 'textfield', WebkitAppearance: 'none' }}
               autoFocus
