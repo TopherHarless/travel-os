@@ -233,8 +233,8 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
   }, [trip?.destination, trip?.departureDate, trip?.returnDate, trip?.isMultiPhase, phasesKey])
 
   const { cfg, list } = useMemo(
-    () => (trip ? generatePackingList(trip, travelers, userInventory, state.templateOverrides ?? {}) : { cfg: {}, list: {} }),
-    [trip, travelers, userInventory, state.templateOverrides]
+    () => (trip ? generatePackingList(trip, travelers, userInventory, state.templateOverrides ?? {}, state.itemOverrides ?? {}) : { cfg: {}, list: {} }),
+    [trip, travelers, userInventory, state.templateOverrides, state.itemOverrides]
   )
 
   const weatherConditions = useMemo(() => {
@@ -608,6 +608,7 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
               travelerId={drawerTraveler}
               trip={trip}
               userInventory={userInventory}
+              itemOverrides={state.itemOverrides ?? {}}
               onClose={() => setDrawerTraveler(null)}
               onAddToTrip={(travelerId, category, item) => {
                 if (item._restore) {

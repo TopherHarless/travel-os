@@ -165,8 +165,9 @@ export function getSharedPackingList(selectedTravelerIds, cfg) {
 // Full packing list for all selected travelers.
 // userInventory: { [travelerId]: { [category]: [item] } }  — merged in alongside static items
 // templateOverrides: { [tripTypeId]: { removals: [id], additions: [item] } }
-// Applies trip.removedItemIds, templateOverrides, and trip.customItems after the base list.
-export function generatePackingList(trip, travelers, userInventory = {}, templateOverrides = {}) {
+// itemOverrides: { [itemId]: item }  — name/qty/note edits to static items made via Inventory view
+// Applies trip.removedItemIds, templateOverrides, itemOverrides, and trip.customItems after the base list.
+export function generatePackingList(trip, travelers, userInventory = {}, templateOverrides = {}, itemOverrides = {}) {
   const cfg = buildTripConfig(trip, travelers)
   const removedIds = new Set(trip.removedItemIds || [])
 
@@ -180,9 +181,17 @@ export function generatePackingList(trip, travelers, userInventory = {}, templat
     const userItems = userInventory[tid] || {}
     const baseList  = getPackingListForTraveler(tid, cfg, userItems)
 
+    // Apply item overrides (name/qty/note edits made in Inventory view to static items)
+    const overriddenList = {}
+    for (const [cat, items] of Object.entries(baseList)) {
+      overriddenList[cat] = items.map(item =>
+        itemOverrides[item.id] ? { ...item, ...itemOverrides[item.id] } : item
+      )
+    }
+
     // Apply removals (trip-level + template-level)
     const finalList = {}
-    for (const [cat, items] of Object.entries(baseList)) {
+    for (const [cat, items] of Object.entries(overriddenList)) {
       const filtered = items.filter(item => !allRemovedIds.has(item.id))
       if (filtered.length) finalList[cat] = filtered
     }

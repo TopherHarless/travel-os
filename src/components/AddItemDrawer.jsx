@@ -18,12 +18,13 @@ const CAT_LABELS = Object.fromEntries(CAT_OPTIONS.map(c => [c.val, c.label]))
 const TRAVELER_LABELS = { topher: 'Topher', lanita: 'La Nita', crosby: 'Crosby', penn: 'Penn', shared: 'Shared' }
 
 // Build a flat search index of all items for a traveler
-function buildIndex(travelerId, userInventory) {
+function buildIndex(travelerId, userInventory, itemOverrides = {}) {
   const items = []
   const travelerItems = ALL_ITEMS[travelerId] || {}
   for (const [cat, list] of Object.entries(travelerItems)) {
     for (const item of list) {
-      items.push({ ...item, category: cat, source: 'static' })
+      const overridden = itemOverrides[item.id] ? { ...item, ...itemOverrides[item.id] } : item
+      items.push({ ...overridden, category: cat, source: 'static' })
     }
   }
   const userItems = userInventory?.[travelerId] || {}
@@ -41,7 +42,7 @@ const BLANK_FORM = {
 }
 
 export default function AddItemDrawer({
-  travelerId, trip, userInventory,
+  travelerId, trip, userInventory, itemOverrides = {},
   onClose, onAddToTrip, onSaveToInventory,
 }) {
   const [tab, setTab] = useState('search')
@@ -54,8 +55,8 @@ export default function AddItemDrawer({
   useEffect(() => { searchRef.current?.focus() }, [])
 
   const searchIndex = useMemo(
-    () => buildIndex(travelerId, userInventory),
-    [travelerId, userInventory]
+    () => buildIndex(travelerId, userInventory, itemOverrides),
+    [travelerId, userInventory, itemOverrides]
   )
 
   // IDs currently visible in the trip list (custom-added items for this traveler)
