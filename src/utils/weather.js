@@ -101,14 +101,29 @@ export function weatherCodeToIcon(code) {
 }
 
 // Open-Meteo only forecasts ~16 days ahead
+const FORECAST_MAX_DAYS = 15
+
 export function isWithinForecastRange(departureDateStr) {
-  const dep = new Date(departureDateStr)
+  const dep = new Date(departureDateStr + 'T12:00:00')
   const now = new Date()
   const diffDays = Math.floor((dep - now) / (1000 * 60 * 60 * 24))
-  return diffDays <= 15
+  return diffDays <= FORECAST_MAX_DAYS
+}
+
+// Clamp returnDate to the forecast ceiling so we never ask for days beyond ~16 out
+function clampReturnDate(returnDateStr) {
+  const ret = new Date(returnDateStr + 'T12:00:00')
+  const maxDate = new Date()
+  maxDate.setDate(maxDate.getDate() + FORECAST_MAX_DAYS)
+  const clamped = ret < maxDate ? ret : maxDate
+  return clamped.toISOString().slice(0, 10)
 }
 
 export async function getWeatherForTrip(destination, departureDate, returnDate) {
+  if (!destination || !departureDate || !returnDate) {
+    throw new Error('Missing destination or dates')
+  }
+
   const { lat, lon, name, country } = await geocodeDestination(destination)
   const location = `${name}, ${country}`
   const within = isWithinForecastRange(departureDate)
@@ -131,7 +146,9 @@ export async function getWeatherForTrip(destination, departureDate, returnDate) 
     }
   }
 
-  const data = await fetchForecast(lat, lon, departureDate, returnDate)
+  // Clamp the end date so we never request beyond what Open-Meteo supports
+  const clampedReturn = clampReturnDate(returnDate)
+  const data = await fetchForecast(lat, lon, departureDate, clampedReturn)
   const days = data.daily.time.map((date, i) => ({
     date,
     high: Math.round(data.daily.temperature_2m_max[i]),
