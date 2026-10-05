@@ -158,17 +158,32 @@ export default function App() {
   useEffect(() => {
     if (!user) return
 
+    // Track whether the first snapshot has been received (to avoid seeding over existing data)
+    let firstSnapshot = true
+
     const unsubscribe = db.collection('travelos_users').doc(user.uid)
-      .onSnapshot(doc => {
+      .onSnapshot({ includeMetadataChanges: false }, doc => {
+        // Skip snapshots triggered by our own local writes (fromCache=false, hasPendingWrites=false means it came from server)
+        // But only skip if it's a local write echo — if it came from another device we always want it
+        const isOwnWrite = doc.metadata.hasPendingWrites
+
         if (doc.exists()) {
-          justLoadedFromCloud.current = true
-          replaceAllState(doc.data())
-        } else {
-          // First login — seed Firestore with current local state
-          db.collection('travelos_users').doc(user.uid)
-            .set(sanitizeForFirestore(state))
-            .catch(console.error)
+          if (!isOwnWrite) {
+            // Data came from server (either initial load or another device's write)
+            justLoadedFromCloud.current = true
+            replaceAllState(doc.data())
+          }
+        } else if (firstSnapshot) {
+          // Doc doesn't exist yet — only seed if this is the very first snapshot
+          // and only if we actually have trips to seed (don't overwrite with empty state)
+          const currentState = sanitizeForFirestore(state)
+          if (currentState.trips?.length > 0) {
+            db.collection('travelos_users').doc(user.uid)
+              .set(currentState)
+              .catch(console.error)
+          }
         }
+        firstSnapshot = false
       }, err => console.error('Firestore sync error:', err))
 
     return unsubscribe
