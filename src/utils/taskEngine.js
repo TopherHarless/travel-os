@@ -1,6 +1,31 @@
 // Generates pre-trip and day-1 tasks from trip config
 
-export function generateTasks(trip, cfg, travelers) {
+// Detect if an item needs charging based on its name
+function itemNeedsCharging(item) {
+  const name = (item.name || '').toLowerCase()
+  return (
+    name.includes('charger') ||
+    name.includes('usb-c') ||
+    name.includes('usb-b') ||
+    name.includes('lightning') ||
+    name.includes('+ cable') ||
+    name.includes('+ usb') ||
+    name.includes('+ charger') ||
+    name.includes('portable battery')
+  )
+}
+
+// Generate "Charge [item]" task label from item name
+// e.g. "iPad + USB-C Cable" → "Charge iPad"
+// e.g. "Apple Watch + Charger" → "Charge Apple Watch"
+function chargeLabel(item) {
+  const name = item.name || ''
+  // Strip everything from " +" onward to get the base device name
+  const base = name.split(/\s*\+\s*/)[0].trim()
+  return `Charge ${base}`
+}
+
+export function generateTasks(trip, cfg, travelers, packingList = {}) {
   const preTripTasks = []
   const day1Tasks    = []
 
@@ -56,5 +81,22 @@ export function generateTasks(trip, cfg, travelers) {
     repackTasks.push({ id: 'rp-chargers',   text: `Day of transition: Confirm all chargers moved to ${p2Label} bag` })
   }
 
-  return { preTripTasks, day1Tasks, repackTasks }
+  // Night-before charging tasks — one per chargeable item on the active packing list
+  const nightBeforeTasks = []
+  const seenChargeLabels = new Set()
+  for (const [, travelerList] of Object.entries(packingList)) {
+    for (const [, items] of Object.entries(travelerList)) {
+      for (const item of items) {
+        if (itemNeedsCharging(item)) {
+          const label = chargeLabel(item)
+          if (!seenChargeLabels.has(label)) {
+            seenChargeLabels.add(label)
+            nightBeforeTasks.push({ id: `nb-${item.id}`, text: label })
+          }
+        }
+      }
+    }
+  }
+
+  return { preTripTasks, day1Tasks, repackTasks, nightBeforeTasks }
 }

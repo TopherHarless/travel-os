@@ -284,9 +284,9 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
     return Object.keys(defaults).length > 0 ? { ...defaults, ...saved } : saved
   }, [trip?.itemPhases, trip?.isMultiPhase, cfg.isBusiness, weatherList])
 
-  const { preTripTasks, day1Tasks, repackTasks } = useMemo(
-    () => (trip ? generateTasks(trip, cfg, travelers) : { preTripTasks: [], day1Tasks: [], repackTasks: [] }),
-    [trip, cfg, travelers]
+  const { preTripTasks, day1Tasks, repackTasks, nightBeforeTasks } = useMemo(
+    () => (trip ? generateTasks(trip, cfg, travelers, list) : { preTripTasks: [], day1Tasks: [], repackTasks: [], nightBeforeTasks: [] }),
+    [trip, cfg, travelers, list]
   )
 
   const flightOnlyItems = useMemo(() => {
@@ -469,16 +469,21 @@ export default function TripDetailView({ state, tripId, onBack, toggleItem, togg
                 const filteredPre = preTripTasks.filter(t => !deleted.has(t.id))
                 const filteredDay1 = day1Tasks.filter(t => !deleted.has(t.id))
                 const filteredRepack = (repackTasks || []).filter(t => !deleted.has(t.id))
+                const filteredNightBefore = (nightBeforeTasks || []).filter(t => !deleted.has(t.id))
                 const customPre = customTasks.filter(t => t.section === 'pre')
                 const customDay1 = customTasks.filter(t => t.section === 'day1')
                 const customRepack = customTasks.filter(t => t.section === 'repack')
+                const customNightBefore = customTasks.filter(t => t.section === 'nightbefore')
                 return (<>
                   <TaskGroup title="Pre-Trip Tasks" tasks={[...filteredPre, ...customPre]} section="pre" {...sharedProps} />
+                  {(filteredNightBefore.length > 0 || customNightBefore.length > 0) && (
+                    <TaskGroup title="🌙 Night Before — Charge Everything" tasks={[...filteredNightBefore, ...customNightBefore]} section="nightbefore" {...sharedProps} />
+                  )}
                   <TaskGroup title="Day 1 Tasks" tasks={[...filteredDay1, ...customDay1]} section="day1" {...sharedProps} />
                   {(filteredRepack.length > 0 || customRepack.length > 0) && (
                     <TaskGroup title="🔄 Repack Plan — Phase Transition" tasks={[...filteredRepack, ...customRepack]} section="repack" {...sharedProps} />
                   )}
-                  {filteredPre.length === 0 && filteredDay1.length === 0 && !filteredRepack.length && customTasks.length === 0 && (
+                  {filteredPre.length === 0 && filteredDay1.length === 0 && !filteredRepack.length && !filteredNightBefore.length && customTasks.length === 0 && (
                     <p className="text-center text-[#6B7280] text-sm py-8">No tasks generated for this trip type</p>
                   )}
                 </>)
