@@ -189,14 +189,16 @@ export default function App() {
     let firstSnapshot = true
 
     const unsubscribe = db.collection('travelos_users').doc(user.uid)
-      .onSnapshot({ includeMetadataChanges: false }, doc => {
-        // Skip snapshots triggered by our own local writes (fromCache=false, hasPendingWrites=false means it came from server)
-        // But only skip if it's a local write echo — if it came from another device we always want it
-        const isOwnWrite = doc.metadata.hasPendingWrites
+      .onSnapshot({ includeMetadataChanges: true }, doc => {
+        // Skip snapshots that are still pending local write (not yet confirmed by server)
+        // Also skip snapshots served from local cache (fromCache=true means offline/stale)
+        const isPending = doc.metadata.hasPendingWrites
+        const isFromCache = doc.metadata.fromCache
 
+        // Only apply data when it's a confirmed server snapshot (not pending, not from cache)
         if (doc.exists()) {
-          if (!isOwnWrite) {
-            // Data came from server (either initial load or another device's write)
+          if (!isPending && !isFromCache) {
+            // Data confirmed from server — apply to local state
             justLoadedFromCloud.current = true
             replaceAllState(doc.data())
           }
