@@ -92,6 +92,7 @@ export function resolveQty(key, cfg) {
     case 'dressShirts':        return cfg.suitDays + cfg.dressShirtDays + 1
     case 'tiesTotal':          return cfg.suitDays + cfg.dressShirtDays
     case 'suitDaysPlusOne':    return cfg.suitDays + 1
+    case 'formalDaysPlusOne':  return cfg.suitDays + cfg.dressShirtDays + 1
     case 'tripDays':           return cfg.days
     case 'pennOnesies':        return cfg.days + 2
     case 'pennPajamas':        return cfg.days + 1
