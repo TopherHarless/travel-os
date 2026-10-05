@@ -239,9 +239,9 @@ export function useTravelStore() {
   }, [setState])
 
   const updateUserItem = useCallback((traveler, category, itemId, updates) => {
-    setState(s => ({
-      ...s,
-      userInventory: {
+    setState(s => {
+      // 1. Update in userInventory
+      const newInventory = {
         ...s.userInventory,
         [traveler]: {
           ...(s.userInventory?.[traveler] || {}),
@@ -249,8 +249,28 @@ export function useTravelStore() {
             item => item.id === itemId ? { ...item, ...updates } : item
           ),
         },
-      },
-    }))
+      }
+
+      // 2. Propagate to any trip's customItems that reference this item
+      const newTrips = s.trips.map(trip => {
+        const tripItems = trip.customItems?.[traveler]
+        if (!tripItems) return trip
+        let changed = false
+        const newTripItems = {}
+        for (const [cat, items] of Object.entries(tripItems)) {
+          const mapped = items.map(item => {
+            if (item.id !== itemId) return item
+            changed = true
+            return { ...item, ...updates }
+          })
+          newTripItems[cat] = mapped
+        }
+        if (!changed) return trip
+        return { ...trip, customItems: { ...trip.customItems, [traveler]: newTripItems } }
+      })
+
+      return { ...s, userInventory: newInventory, trips: newTrips }
+    })
   }, [setState])
 
   const deleteUserItem = useCallback((traveler, category, itemId) => {

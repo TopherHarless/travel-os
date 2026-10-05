@@ -58,7 +58,7 @@ export default function AddItemDrawer({
     [travelerId, userInventory]
   )
 
-  // IDs currently visible in the trip list
+  // IDs currently visible in the trip list (custom-added items for this traveler)
   const activeIds = useMemo(() => {
     const ids = new Set()
     const tripItems = trip.customItems?.[travelerId] || {}
@@ -103,7 +103,10 @@ export default function AddItemDrawer({
   function handleConfirmSave(saveToInventory) {
     if (!pendingItem) return
     if (saveToInventory) {
+      // Save to inventory — this will auto-appear in future trips based on conditions.
+      // Also add to THIS trip immediately so it shows up now.
       onSaveToInventory(travelerId, form.category, pendingItem)
+      onAddToTrip(travelerId, form.category, { ...pendingItem, conditions: ['always'] })
     } else {
       onAddToTrip(travelerId, form.category, { ...pendingItem, conditions: ['always'] })
     }
